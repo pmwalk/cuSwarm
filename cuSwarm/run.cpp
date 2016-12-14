@@ -555,7 +555,7 @@ static void display(void)
 	for (uint i = 0; i < p.num_robots; i++) {
 
 		// Orientation lines
-		if (modes[i] >= 0) {
+		if ((p.show_leaders_only && modes[i] == 0) || (!p.show_leaders_only)) {
 			glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
 			glLineWidth(2.0f);
 			glBegin(GL_LINES);
@@ -573,7 +573,8 @@ static void display(void)
 		if (p.show_connections) {
 			for (uint j = i + 1; j < p.num_robots; j++) {
 				if (laplacian[(i * p.num_robots) + j] == -1) {
-					if (modes[i] >= 0 && modes[j] >= 0) {
+					if ((p.show_leaders_only && modes[i] == 0 && modes[j] == 0) 
+							|| (!p.show_leaders_only)) {
 						glBegin(GL_LINES);
 						glVertex3f(positions[i].x, positions[i].y, 0.0f);
 						glVertex3f(positions[j].x, positions[j].y, 0.0f);

@@ -326,7 +326,7 @@ __global__ void side_kernel(float4* pos, int* mode, int* leaders,
 		if (my_leader_countdown == 0) {
 			// Switch to a leader if not already; else switch to non-leader
 			if (my_mode == 0) {
-				my_mode = 99;
+				my_mode = p.hops + 1;
 				my_nearest_leader = -1;
 				// Assign as non-leader for 1 second +/- (0-1/2) second
 				leader_countdown[i] = 60 +
@@ -342,7 +342,7 @@ __global__ void side_kernel(float4* pos, int* mode, int* leaders,
 		}
 
 		// Find the neighbor with the lowest mode (i.e. lowest hops to leader)
-		int closest_n_mode = INT_MAX;
+		int closest_n_mode = p.hops + 1;
 		int closest_n_idx = INT_MAX;
 		for (int n = 0; n < p.num_robots; n++) {
 			// Get the distance between the robots
@@ -606,10 +606,10 @@ __device__ void flock(int myMode, float3 nVel, int nMode, float3 dist3,
 	float2* repel, float2* align, float2* cohere, bool is_ap, Parameters p)
 {
 	// Main flocking section
-	if (dist3.z <= p.range_f) {
+	if (dist3.z <= p.range) {
 		// REPEL
 		// Robots repel from neighbors within flocking repel range
-		float weight = powf(p.range_f - dist3.z, 2.0f);
+		float weight = powf(p.range - dist3.z, 4.0f);
 		repel->x -= weight * dist3.x;
 		repel->y -= weight * dist3.y;
 	}
@@ -620,10 +620,10 @@ __device__ void flock(int myMode, float3 nVel, int nMode, float3 dist3,
 		align->x += weight * nVel.x;
 		align->y += weight * nVel.y;
 	}
-	if (dist3.z > p.range_r && dist3.z <= p.range) {
+	if (dist3.z < p.range) {
 		// COHERE
 		// Do not cohere to neighbors within repel range
-		float weight = powf(dist3.z - p.range_r, 2.0f);
+		float weight = powf(dist3.z, 4.0f);
 		//(is_ap) ? weight = 1000.0f : weight *= 1.0f;
 		cohere->x += weight * dist3.x;
 		cohere->y += weight * dist3.y;
@@ -728,6 +728,9 @@ __device__ void setColor(uchar4* color, int mode, bool is_ap, uint i,
 				break;
 			case 3:
 				*color = make_uchar4(200, 200, 50, 255);
+				break;
+			case 4:
+				*color = make_uchar4(50, 200, 200, 255);
 				break;
 			default:
 				*color = make_uchar4(100, 100, 100, 255);
