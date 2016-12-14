@@ -799,8 +799,6 @@ void processParam(std::vector<std::string> tokens)
 		p.targets = std::stoul(tokens[1]);
 	else if (tokens[0] == "training")
 		p.training = (std::stoul(tokens[1]) != 0);
-	else if (tokens[0] == "update_period")
-		p.update_period = std::stoul(tokens[1]);
 	else if (tokens[0] == "vel_bound")
 		p.vel_bound = std::stof(tokens[1]);
 	else if (tokens[0] == "window_height")

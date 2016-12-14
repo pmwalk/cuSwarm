@@ -75,7 +75,6 @@ struct Parameters
 	uint step_limit;
 	bool training;
 	uint targets;
-	uint update_period;
 	float vel_bound;
 	uint window_height;
 	uint window_width;

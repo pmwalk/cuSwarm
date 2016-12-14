@@ -318,83 +318,64 @@ __global__ void side_kernel(float4* pos, int* mode, int* leaders,
 
 	curandState local_state = rand_state[i];
 
-	// Do not perform leader calculation if a noise robot, or in a non-update step
-	if (mode[i] != -1 && ((sn + i) % p.update_period == 0 || sn == 0)) {
+	// Do not perform leader calculation if a noise robot
+	if (mode[i] != -1) {
 
 		// Perform either RCC or CH leader assignment, depending on parameter
 		if (p.leader_selection == 0) {
 
 			// Holds the new mode and nearest leader during computation
-			int new_mode = mode[i];
-			int new_nearest_leader = nearest_leader[i];
-			int new_leader_countdown = leader_countdown[i];
+			int my_mode = mode[i];
+			int my_nearest_leader = nearest_leader[i];
+			int my_leader_countdown = leader_countdown[i];
 
 			// If the leader countdown for this robot has expired, switch leader 
 			// state and reset the timer;
-			if (new_leader_countdown == 0) {
+			if (my_leader_countdown == 0) {
 				// Switch to a leader if not already; else switch to non-leader
-				if (mode[i] == 0) {
-					new_mode = 99;
-					new_nearest_leader = -1;
-					// Assign as non-leader for 1 second +/- (0-1/6) seconds
-					leader_countdown[i] = 6 + 
-						static_cast<int>(curand_uniform(&local_state) * 2.0f);
+				if (my_mode == 0) {
+					my_mode = 99;
+					my_nearest_leader = -1;
+					// Assign as non-leader for 1 second +/- (0-1/2) second
+					leader_countdown[i] = 60 + 
+						static_cast<int>(curand_uniform(&local_state) * 30.0f);
 				}
-				if (mode[i] > 0) {
-					new_mode = 0;
-					new_nearest_leader = i;
-					// Assign as a leader for 5 seconds +/- (0-1) seconds
-					leader_countdown[i] = 3 + 
-						static_cast<int>(curand_uniform(&local_state) * 2.0f);
+				if (my_mode > 0) {
+					my_mode = 0;
+					my_nearest_leader = i;
+					// Assign as a leader for 2 seconds +/- (0-1) second
+					leader_countdown[i] = 120 + 
+						static_cast<int>(curand_uniform(&local_state) * 60.0f);
 				}
 			}
 
-			// Iterate through all neighbor robots
+			// Find the neighbor with the lowest mode (i.e. lowest hops to leader)
+			int closest_n_mode = INT_MAX;
+			int closest_n_idx = INT_MAX;
 			for (int n = 0; n < p.num_robots; n++) {
 				// Get the distance between the robots
 				float4 me = pos[i];
 				float4 them = pos[n];
 				float2 dist = make_float2(me.x - them.x, me.y - them.y);
-				// Range for hops/leader calculations is max_range / 2
+				// Determine if these robots are within range
 				bool within_range = euclidean(dist) < (p.range_l);
-
-				// If neighbor robot meets the following conditions, reset 
-				// leader countdown and update rank to neighbors + 1:
-				// 1. Within max range
-				// 2. Not this robot
-				// 3. One lower hop rank, but lower nearest leader
-				// 4. Two or more lower hop rank
-				// 
-				// Else, if this neighbor is a leader, reset leader countdown
-				// if neighbor's ID is lower
-				if (within_range && i != n &&
-					((mode[n] + 1 == new_mode &&
-						nearest_leader[n] > nearest_leader[i]) ||
-					(mode[n] + 1 < new_mode)) || 
-					(new_mode == 0 && mode[n] < p.hops - 1 && 
-						nearest_leader[n] > nearest_leader[i])) {
-
-					if (mode[i] == 0) {
-						mode[i] = 0;
-					}
-
-					new_mode = mode[n] + 1;
-					new_nearest_leader = nearest_leader[n];
-					// Reset leader countdown timer to 1 second
-					leader_countdown[i] = 60 +
-						static_cast<int>(curand_uniform(&local_state) *
-						10.0f);
+				// Exclude cases where neighbor and current robot are the same, 
+				// or where the robot is out of range
+				if (i != n && within_range) {
+					closest_n_mode = min(closest_n_mode, mode[n]);
+					closest_n_idx = min(closest_n_idx, n);
 				}
-				else if (within_range && mode[n] == 0 &&
-					new_mode == 0 && n < i) {
+			}
 
-					new_mode = 99;
-					new_nearest_leader = -1;
-					nearest_leader[i] = nearest_leader[n];
-					// Assign as non-leader for 1 second +/- (0-1/6) seconds
+			// Update mode if not a leader
+			if (my_mode != 0) {
+				// Set new mode for this robot
+				my_mode = closest_n_mode + 1;
+				if (closest_n_mode < p.hops) {
+					// Reset leader timer to 1 second +/- (0-1/2) seconds
 					leader_countdown[i] = 60 +
 						static_cast<int>(curand_uniform(&local_state) *
-						10.0f);
+						30.0f);
 				}
 			}
 
@@ -402,8 +383,8 @@ __global__ void side_kernel(float4* pos, int* mode, int* leaders,
 			__syncthreads();
 
 			// Update this robot's mode and nearest leader
-			mode[i] = new_mode;
-			nearest_leader[i] = new_nearest_leader;
+			mode[i] = my_mode;
+			nearest_leader[i] = my_nearest_leader;
 
 			// Decrease countdown timer
 			leader_countdown[i]--;
@@ -606,10 +587,9 @@ __global__ void main_kernel(float4* pos, float3* vel, int* mode,
 	// Set the color based on current mode
 	Color color;
 	setColor(&(color.components), myMode, ap[i], i, p);
-	// Update velocity and mode once every update_period steps (see params.txt)
-	if ((sn + i) % p.update_period == 0 || sn == 0) {
-		vel[i] = make_float3(goal.x, goal.y, mySpeed);
-	}
+	// Update velocity
+	vel[i] = make_float3(goal.x, goal.y, mySpeed);
+
 	// Update position
 	pos[i] = make_float4(myPos.x + vel[i].x, myPos.y + vel[i].y, 0.0f, color.c);
 
@@ -772,6 +752,24 @@ __device__ void setColor(uchar4* color, int mode, bool is_ap, uint i,
 	}
 	else {
 		*color = make_uchar4(0, 0, 0, 0);
+	}
+
+	switch (mode) {
+	case 0:
+		*color = make_uchar4(255, 0, 0, 255);
+		break;
+	case 1:
+		*color = make_uchar4(0, 255, 0, 255);
+		break;
+	case 2:
+		*color = make_uchar4(50, 50, 255, 255);
+		break;
+	case 3:
+		*color = make_uchar4(155, 155, 155, 155);
+		break;
+	default:
+		*color = make_uchar4(255, 255, 255, 255);
+		break;
 	}
 }
 

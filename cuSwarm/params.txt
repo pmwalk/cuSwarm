@@ -1,7 +1,7 @@
 	# Weight given to the align vector
 align_weight 1.0
 	# Maximum angular velocity of robots (rad/s)
-ang_bound 6.28318530717
+ang_bound 62.8318530717
 	# Control law set to use:
 	#     0 = rendezvous
 	#     1 = flocking
@@ -61,9 +61,9 @@ show_leaders 1
 	# Show communication range
 show_range 0
 	# Show communication range of leaders
-show_range_leaders 1
+show_range_leaders 0
 	# Highlight leaders
-highlight_leaders 1
+highlight_leaders 0
 	# Show non-leader robots
 show_non_leaders 1
 	# Size of the starting space (robot spawn and obstacle-free)
@@ -75,8 +75,6 @@ step_limit 72000
 targets 0
 	# Training mode
 training 1
-	# Robots update their motion once every update_period steps
-update_period 1
 	# Velocity bound of the robots in m/s (one cell = one meter)
 vel_bound 3.0
 	# Initial window height of GUI (depricated)
