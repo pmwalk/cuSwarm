@@ -259,7 +259,6 @@ __global__ void init_kernel(float4* pos, float3* vel, int* mode,
 	uint i = blockIdx.x * blockDim.x + threadIdx.x;
 
 	// Frequently-used parameters
-	float n_f = static_cast<float>(p.num_robots);
 	float ws = static_cast<float>(p.world_size);
 
 	// Seed the RNG
@@ -268,10 +267,6 @@ __global__ void init_kernel(float4* pos, float3* vel, int* mode,
 
 	// Initialize mode
 	mode[i] = p.hops + 1;
-	// Make the first noise % robots have a mode of -1 (noise mode)
-	if (i < static_cast<int>(p.noise * n_f)) {
-		mode[i] = -1;
-	}
 
 	// Initialize nearest_leader and leader_countdown arrays for RCC leader 
 	// selection
@@ -318,86 +313,82 @@ __global__ void side_kernel(float4* pos, int* mode, int* leaders,
 
 	curandState local_state = rand_state[i];
 
-	// Do not perform leader calculation if a noise robot
-	if (mode[i] != -1) {
+	// Perform either RCC or CH leader assignment, depending on parameter
+	if (p.leader_selection == 0) {
 
-		// Perform either RCC or CH leader assignment, depending on parameter
-		if (p.leader_selection == 0) {
+		// Holds the new mode and nearest leader during computation
+		int my_mode = mode[i];
+		int my_nearest_leader = nearest_leader[i];
+		int my_leader_countdown = leader_countdown[i];
 
-			// Holds the new mode and nearest leader during computation
-			int my_mode = mode[i];
-			int my_nearest_leader = nearest_leader[i];
-			int my_leader_countdown = leader_countdown[i];
-
-			// If the leader countdown for this robot has expired, switch leader 
-			// state and reset the timer;
-			if (my_leader_countdown == 0) {
-				// Switch to a leader if not already; else switch to non-leader
-				if (my_mode == 0) {
-					my_mode = 99;
-					my_nearest_leader = -1;
-					// Assign as non-leader for 1 second +/- (0-1/2) second
-					leader_countdown[i] = 60 + 
-						static_cast<int>(curand_uniform(&local_state) * 30.0f);
-				}
-				if (my_mode > 0) {
-					my_mode = 0;
-					my_nearest_leader = i;
-					// Assign as a leader for 2 seconds +/- (0-1) second
-					leader_countdown[i] = 120 + 
-						static_cast<int>(curand_uniform(&local_state) * 60.0f);
-				}
+		// If the leader countdown for this robot has expired, switch leader 
+		// state and reset the timer;
+		if (my_leader_countdown == 0) {
+			// Switch to a leader if not already; else switch to non-leader
+			if (my_mode == 0) {
+				my_mode = 99;
+				my_nearest_leader = -1;
+				// Assign as non-leader for 1 second +/- (0-1/2) second
+				leader_countdown[i] = 60 + 
+					static_cast<int>(curand_uniform(&local_state) * 30.0f);
 			}
-
-			// Find the neighbor with the lowest mode (i.e. lowest hops to leader)
-			int closest_n_mode = INT_MAX;
-			int closest_n_idx = INT_MAX;
-			for (int n = 0; n < p.num_robots; n++) {
-				// Get the distance between the robots
-				float4 me = pos[i];
-				float4 them = pos[n];
-				float2 dist = make_float2(me.x - them.x, me.y - them.y);
-				// Determine if these robots are within range
-				bool within_range = euclidean(dist) < (p.range_l);
-				// Exclude cases where neighbor and current robot are the same, 
-				// or where the robot is out of range
-				if (i != n && within_range) {
-					closest_n_mode = min(closest_n_mode, mode[n]);
-					closest_n_idx = min(closest_n_idx, n);
-				}
+			if (my_mode > 0) {
+				my_mode = 0;
+				my_nearest_leader = i;
+				// Assign as a leader for 2 seconds +/- (0-1) second
+				leader_countdown[i] = 120 + 
+					static_cast<int>(curand_uniform(&local_state) * 60.0f);
 			}
-
-			// Update mode if not a leader
-			if (my_mode != 0) {
-				// Set new mode for this robot
-				my_mode = closest_n_mode + 1;
-				if (closest_n_mode < p.hops) {
-					// Reset leader timer to 1 second +/- (0-1/2) seconds
-					leader_countdown[i] = 60 +
-						static_cast<int>(curand_uniform(&local_state) *
-						30.0f);
-				}
-			}
-
-			// Synchronize threads before updating mode and neighbor arrays
-			__syncthreads();
-
-			// Update this robot's mode and nearest leader
-			mode[i] = my_mode;
-			nearest_leader[i] = my_nearest_leader;
-
-			// Decrease countdown timer
-			leader_countdown[i]--;
 		}
-		else if (p.leader_selection == 1) {
-			// Look at the index of this robot in the leader list to determine if 
-			// this robot should be a leader
-			if (leaders[i] == 0) {
-				mode[i] = 0;
+
+		// Find the neighbor with the lowest mode (i.e. lowest hops to leader)
+		int closest_n_mode = INT_MAX;
+		int closest_n_idx = INT_MAX;
+		for (int n = 0; n < p.num_robots; n++) {
+			// Get the distance between the robots
+			float4 me = pos[i];
+			float4 them = pos[n];
+			float2 dist = make_float2(me.x - them.x, me.y - them.y);
+			// Determine if these robots are within range
+			bool within_range = euclidean(dist) < (p.range_l);
+			// Exclude cases where neighbor and current robot are the same, 
+			// or where the robot is out of range
+			if (i != n && within_range) {
+				closest_n_mode = min(closest_n_mode, mode[n]);
+				closest_n_idx = min(closest_n_idx, n);
 			}
-			else {
-				mode[i] = 1;
+		}
+
+		// Update mode if not a leader
+		if (my_mode != 0) {
+			// Set new mode for this robot
+			my_mode = closest_n_mode + 1;
+			if (closest_n_mode < p.hops) {
+				// Reset leader timer to 1 second +/- (0-1/2) seconds
+				leader_countdown[i] = 60 +
+					static_cast<int>(curand_uniform(&local_state) *
+					30.0f);
 			}
+		}
+
+		// Synchronize threads before updating mode and neighbor arrays
+		__syncthreads();
+
+		// Update this robot's mode and nearest leader
+		mode[i] = my_mode;
+		nearest_leader[i] = my_nearest_leader;
+
+		// Decrease countdown timer
+		leader_countdown[i]--;
+	}
+	else if (p.leader_selection == 1) {
+		// Look at the index of this robot in the leader list to determine if 
+		// this robot should be a leader
+		if (leaders[i] == 0) {
+			mode[i] = 0;
+		}
+		else {
+			mode[i] = 1;
 		}
 	}
 
@@ -459,121 +450,113 @@ __global__ void main_kernel(float4* pos, float3* vel, int* mode,
 	float2 flow = make_float2(0.0f, 0.0f);
 	float2 goal = make_float2(0.0f, 0.0f);
 
-	// Ignore behavior operations if this robot is noise
-	if (myMode != -1) {
-		// If we are flocking and a leader, set the alignment vector towards 
-		// the goal point
-		if (p.behavior == 1 && myMode == 0) {
-			align.x = goal_heading.x;
-			align.y = goal_heading.y;
-		}
+	// If we are flocking and a leader, set the alignment vector towards 
+	// the goal point
+	if (p.behavior == 1 && myMode == 0) {
+		align.x = goal_heading.x;
+		align.y = goal_heading.y;
+	}
 
-		// Iterate through blocks to use shared memory within a block
-		for (uint tile = 0; tile < gridDim.x; tile++) {
+	// Iterate through blocks to use shared memory within a block
+	for (uint tile = 0; tile < gridDim.x; tile++) {
 
-			// Assign shared memory for this block
-			uint n = tile * blockDim.x + threadIdx.x;
-			s_pos[threadIdx.x] = pos[n];
-			s_vel[threadIdx.x] = vel[n];
-			s_mode[threadIdx.x] = mode[n];
-			s_ap[threadIdx.x] = ap[n];
+		// Assign shared memory for this block
+		uint n = tile * blockDim.x + threadIdx.x;
+		s_pos[threadIdx.x] = pos[n];
+		s_vel[threadIdx.x] = vel[n];
+		s_mode[threadIdx.x] = mode[n];
+		s_ap[threadIdx.x] = ap[n];
 
-			// Synchronize threads after shared memory is assigned
-			__syncthreads();
+		// Synchronize threads after shared memory is assigned
+		__syncthreads();
 
-			// Iterate through all threads in this block
-			for (uint ti = 0; ti < blockDim.x; ti++) {
-				// Do not perform an interaction between this robot and itself
-				if (i != tile * blockDim.x + ti) {
+		// Iterate through all threads in this block
+		for (uint ti = 0; ti < blockDim.x; ti++) {
+			// Do not perform an interaction between this robot and itself
+			if (i != tile * blockDim.x + ti) {
 
-					// Calculate the distance between the two robots on all axes
-					float dist_x = s_pos[ti].x - myPos.x;
-					float dist_y = s_pos[ti].y - myPos.y;
-					// Calculate the Euclidean distance between the two robots
-					float dist = euclidean(make_float2(dist_x, dist_y));
+				// Calculate the distance between the two robots on all axes
+				float dist_x = s_pos[ti].x - myPos.x;
+				float dist_y = s_pos[ti].y - myPos.y;
+				// Calculate the Euclidean distance between the two robots
+				float dist = euclidean(make_float2(dist_x, dist_y));
 
-					// Perform interaction for neighbors within range
-					if (dist <= p.range) {
+				// Perform interaction for neighbors within range
+				if (dist <= p.range) {
 
-						// Create collecte distance variable (for readability)
-						float3 dist3 = make_float3(dist_x, dist_y, dist);
+					// Create collecte distance variable (for readability)
+					float3 dist3 = make_float3(dist_x, dist_y, dist);
 
-						// Perform the interaction for this robot pair based on 
-						// the current behavior
-						switch (p.behavior) {
-						case 0:
-							rendezvous(dist3, &min_bounds, &max_bounds, &repel, 
-								s_ap[ti], p);
-							break;
-						case 1:
-							flock(myMode, s_vel[ti], s_mode[ti], dist3, &repel, 
-								&align, &cohere, s_ap[ti], p);
-							break;
-						case 2:
-							disperse(dist3, &repel, &cohere, s_ap[ti], p);
-							break;
-						case 3:
-							rendezvousToPoint(dist3, &repel, p);
-							break;
-						}
+					// Perform the interaction for this robot pair based on 
+					// the current behavior
+					switch (p.behavior) {
+					case 0:
+						rendezvous(dist3, &min_bounds, &max_bounds, &repel, 
+							s_ap[ti], p);
+						break;
+					case 1:
+						flock(myMode, s_vel[ti], s_mode[ti], dist3, &repel, 
+							&align, &cohere, s_ap[ti], p);
+						break;
+					case 2:
+						disperse(dist3, &repel, &cohere, s_ap[ti], p);
+						break;
+					case 3:
+						rendezvousToPoint(dist3, &repel, p);
+						break;
 					}
 				}
 			}
 		}
-
-		// Perform obstacle avoidance computation for this robot
-		obstacleAvoidance(myPos, &avoid, &dist_to_obstacle, occupancy, p);
-
-		// Finish necessary summary computations for each behavior
-		switch (p.behavior) {
-		case 0:
-			// Finish computation of parallel circumcenter algorithm
-			cohere.x = ((min_bounds.x + max_bounds.x) / 2.0f);
-			cohere.y = ((min_bounds.y + max_bounds.y) / 2.0f);
-			break;
-		case 1:
-			break;
-		case 2:
-			break;
-		case 3:
-			// Set align vector to point toward goal point
-			float align_angle = atan2f(goal_point.y - myPos.y,
-				goal_point.x - myPos.x);
-			align.x = cosf(align_angle);
-			align.y = sinf(align_angle);
-			break;
-		}
-
-		// If velocity is affected by random flows, calculate flow effect here
-		if (p.current > 0.0f) {
-			for (uint fi = 0; fi < 256; fi++) {
-				float2 dist_v = make_float2(myPos.x - flow_pos[fi].x,
-					myPos.y - flow_pos[fi].y);
-				float dist = euclidean(dist_v);
-				flow.x += flow_dir[fi].x * (1.0f / dist);
-				flow.y += flow_dir[fi].y * (1.0f / dist);
-			}
-		}
-
-		// Scale all component vectors to their weights and compute goal vector
-		rescale(&repel, p.repel_weight, false);
-		rescale(&align, p.align_weight, false);
-		rescale(&cohere, p.cohere_weight, false);
-		rescale(&avoid, 4.0f * powf((p.range_o - dist_to_obstacle), 4.0f), false);
-		// Add random currents, if applicable
-		if (p.current > 0.0f) {
-			rescale(&flow, p.current, false);
-		}
-
-		// Combine behavior components to make the new goal vector
-		goal.x = repel.x + align.x + cohere.x + avoid.x + flow.x;
-		goal.y = repel.y + align.y + cohere.y + avoid.y + flow.y;
 	}
-	else if (myMode == -1) { // Noise robots
-		// Apply error from the normal distribution to the velocity
-		goal.x = curand_normal(&local_state);
-		goal.y = curand_normal(&local_state);
+
+	// Perform obstacle avoidance computation for this robot
+	obstacleAvoidance(myPos, &avoid, &dist_to_obstacle, occupancy, p);
+
+	// Finish necessary summary computations for each behavior
+	switch (p.behavior) {
+	case 0:
+		// Finish computation of parallel circumcenter algorithm
+		cohere.x = ((min_bounds.x + max_bounds.x) / 2.0f);
+		cohere.y = ((min_bounds.y + max_bounds.y) / 2.0f);
+		break;
+	case 1:
+		break;
+	case 2:
+		break;
+	case 3:
+		// Set align vector to point toward goal point
+		float align_angle = atan2f(goal_point.y - myPos.y,
+			goal_point.x - myPos.x);
+		align.x = cosf(align_angle);
+		align.y = sinf(align_angle);
+		break;
 	}
+
+	// If velocity is affected by random flows, calculate flow effect here
+	if (p.current > 0.0f) {
+		for (uint fi = 0; fi < 256; fi++) {
+			float2 dist_v = make_float2(myPos.x - flow_pos[fi].x,
+				myPos.y - flow_pos[fi].y);
+			float dist = euclidean(dist_v);
+			flow.x += flow_dir[fi].x * (1.0f / dist);
+			flow.y += flow_dir[fi].y * (1.0f / dist);
+		}
+	}
+
+	// Scale all component vectors to their weights and compute goal vector
+	rescale(&repel, p.repel_weight, false);
+	rescale(&align, p.align_weight, false);
+	rescale(&cohere, p.cohere_weight, false);
+	rescale(&avoid, 4.0f * powf((p.range_o - dist_to_obstacle), 4.0f), false);
+	// Add random currents, if applicable
+	if (p.current > 0.0f) {
+		rescale(&flow, p.current, false);
+	}
+
+	// Combine behavior components to make the new goal vector
+	goal.x = repel.x + align.x + cohere.x + avoid.x + flow.x;
+	goal.y = repel.y + align.y + cohere.y + avoid.y + flow.y;
 
 	// Cap the angular velocity
 	capAngularVelocity(make_float2(vel[i].x, vel[i].y), 
@@ -731,45 +714,32 @@ __device__ bool checkOccupancy(float x, float y, bool* occupancy, Parameters p)
 __device__ void setColor(uchar4* color, int mode, bool is_ap, uint i, 
 	Parameters p)
 {
-	if (mode == 0 && p.show_leaders) {
-		if (p.highlight_leaders) {
-			(is_ap && p.show_ap) ? *color = make_uchar4(0, 200, 0, 255) :
+	if (p.show_leaders_only && mode == 0 || !p.show_leaders_only) {
+		if (p.show_mode) {
+			switch (mode) {
+			case 0:
 				*color = make_uchar4(255, 0, 0, 255);
+				break;
+			case 1:
+				*color = make_uchar4(0, 200, 0, 255);
+				break;
+			case 2:
+				*color = make_uchar4(100, 100, 255, 255);
+				break;
+			case 3:
+				*color = make_uchar4(200, 200, 50, 255);
+				break;
+			default:
+				*color = make_uchar4(100, 100, 100, 255);
+				break;
+			}
 		}
 		else {
-			(is_ap && p.show_ap) ? *color = make_uchar4(0, 200, 0, 255) :
-				*color = make_uchar4(255, 255, 255, 255);
-		}
-	}
-	else if (mode != 0 && p.show_non_leaders) {
-		if (mode > 0) {
-			(is_ap && p.show_ap) ? *color = make_uchar4(0, 200, 0, 255) :
-				*color = make_uchar4(255, 255, 255, 255);
-		}
-		else {
-			*color = make_uchar4(100, 100, 100, 255);
+			*color = make_uchar4(255, 255, 255, 255);
 		}
 	}
 	else {
 		*color = make_uchar4(0, 0, 0, 0);
-	}
-
-	switch (mode) {
-	case 0:
-		*color = make_uchar4(255, 0, 0, 255);
-		break;
-	case 1:
-		*color = make_uchar4(0, 255, 0, 255);
-		break;
-	case 2:
-		*color = make_uchar4(50, 50, 255, 255);
-		break;
-	case 3:
-		*color = make_uchar4(155, 155, 155, 155);
-		break;
-	default:
-		*color = make_uchar4(255, 255, 255, 255);
-		break;
 	}
 }
 

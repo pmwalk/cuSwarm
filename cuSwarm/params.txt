@@ -14,7 +14,7 @@ confirm_quit 0
 	# Strength of random currents in environment (0.0 = no currents)
 current 0.0
 	# Number of hops used in RCC leader selection mode
-hops 3
+hops 5
 	# Leader selection mode to be used by the swarm:
 	#     0 = RCC selection
 	#     1 = Convex hull selection (not yet working)
@@ -34,12 +34,10 @@ range 6.0			# Maximum obstacle detection range
 max_explore 300
 	# Max x or y dimension of an obstacle
 max_obstacle_size 25
-	# Percentage of robots to be used as noise (not affected by control laws)
-noise 0.0
 	# Number of obstacles present in the environment
 num_obstacles 0
 	# Number of robots in simulation (works best as power of 2)
-num_robots 256
+num_robots 1024
 	# Size of robots in GUI
 point_size 15
 	# Weight given to the align vector
@@ -56,18 +54,16 @@ show_connections 0
 show_convex_hull 0
 	# Show explored area
 show_explored 0
-	# Show leader robots
-show_leaders 1
+	# Show leaders only
+show_leaders_only 0
+	# Show the modes of the robots
+show_mode 1
 	# Show communication range
 show_range 0
 	# Show communication range of leaders
 show_range_leaders 0
-	# Highlight leaders
-highlight_leaders 0
-	# Show non-leader robots
-show_non_leaders 1
 	# Size of the starting space (robot spawn and obstacle-free)
-start_size 20.0
+start_size 50.0
 	# Number of steps before simulation automatically closes (60 steps/sec during) 
 	# GUI mode
 step_limit 72000

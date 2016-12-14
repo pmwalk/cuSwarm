@@ -555,8 +555,7 @@ static void display(void)
 	for (uint i = 0; i < p.num_robots; i++) {
 
 		// Orientation lines
-		if ((p.show_leaders && modes[i] == 0) || 
-			(p.show_non_leaders && modes[i] != 0)) {
+		if (modes[i] >= 0) {
 			glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
 			glLineWidth(2.0f);
 			glBegin(GL_LINES);
@@ -574,10 +573,7 @@ static void display(void)
 		if (p.show_connections) {
 			for (uint j = i + 1; j < p.num_robots; j++) {
 				if (laplacian[(i * p.num_robots) + j] == -1) {
-					if (((p.show_leaders && modes[i] == 0) ||
-						(p.show_non_leaders && modes[i] != 0)) &&
-						((p.show_leaders && modes[j] == 0) ||
-						(p.show_non_leaders && modes[j] != 0))) {
+					if (modes[i] >= 0 && modes[j] >= 0) {
 						glBegin(GL_LINES);
 						glVertex3f(positions[i].x, positions[i].y, 0.0f);
 						glVertex3f(positions[j].x, positions[j].y, 0.0f);
@@ -759,8 +755,6 @@ void processParam(std::vector<std::string> tokens)
 		p.max_explore = std::stoul(tokens[1]);
 	else if (tokens[0] == "max_obstacle_size")
 		p.max_obstacle_size = std::stoul(tokens[1]);
-	else if (tokens[0] == "noise")
-		p.noise = std::stof(tokens[1]);
 	else if (tokens[0] == "num_obstacles")
 		p.num_obstacles = std::stoul(tokens[1]);
 	else if (tokens[0] == "num_robots")
@@ -781,16 +775,14 @@ void processParam(std::vector<std::string> tokens)
 		p.show_convex_hull = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_explored")
 		p.show_explored = (std::stoul(tokens[1]) != 0);
-	else if (tokens[0] == "show_leaders")
-		p.show_leaders = (std::stoul(tokens[1]) != 0);
+	else if (tokens[0] == "show_mode")
+		p.show_mode = (std::stoul(tokens[1]) != 0);
+	else if (tokens[0] == "show_leaders_only")
+		p.show_leaders_only = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_range")
 		p.show_range = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_range_leaders")
 		p.show_range_leaders = (std::stoul(tokens[1]) != 0);
-	else if (tokens[0] == "highlight_leaders")
-		p.highlight_leaders = (std::stoul(tokens[1]) != 0);
-	else if (tokens[0] == "show_non_leaders")
-		p.show_non_leaders = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "start_size")
 		p.start_size = std::stof(tokens[1]);
 	else if (tokens[0] == "step_limit")

@@ -55,7 +55,6 @@ struct Parameters
 	float range;
 	uint max_explore;
 	uint max_obstacle_size;
-	float noise;
 	uint num_obstacles;
 	uint num_robots;
 	uint point_size;
@@ -63,14 +62,13 @@ struct Parameters
 	bool get_connectivity;
 	bool get_ap;
 	bool show_ap;
-	bool highlight_leaders;
 	bool show_connections;
 	bool show_convex_hull;
 	bool show_explored;
-	bool show_leaders;
+	bool show_leaders_only;
+	bool show_mode;
 	bool show_range;
 	bool show_range_leaders;
-	bool show_non_leaders;
 	float start_size;
 	uint step_limit;
 	bool training;
