@@ -24,11 +24,11 @@
 // Simulation variables
 float ws_2;								// Half the length of the world edge
 ulong step_num = 0;						// Step counter
-bool initial_passed = false;			// Indicates if initial state has passed
+bool init_passed = false;				// Indicates if initial state has passed
 bool paused;							// Simulation paused state
 Parameters p;							// Parameters structure
-float3 goal_vector;						// Goal heading / speed (flocking only)
-float goal_heading, goal_heading_err;	// Goal heading and error goal heading
+float3 goal_vector;						// Goal vector
+float goal_heading;						// Goal bearing
 float2 goal_point;						// Goal point (for rendezvous to point)
 int* explored_grid;						// Grid covering the whole environment, 
 										// showing how explored each cell is
@@ -36,8 +36,6 @@ float4* positions;						// Robot positions (x, y, z, color)
 float3* velocities;						// Robot velocities (x, y, z)
 int* modes;								// Robot modes
 int* leaders;							// List of current swarm leaders
-int* nearest_leaders;					// Nearest leader array
-uint* leader_countdowns;				// Leader countdown array
 int* laplacian;							// Laplacian matrix of robot connectivity
 										// (max_a, max_b, max_c, max_d)
 bool* ap;								// Articulation pts (min vertex cut set)
@@ -48,10 +46,11 @@ int3* targets;							// List of targets in the environment
 bool* occupancy;						// Occupancy grid for the environment
 Data data;								// Data object (see data_ops.cpp for data 
 										// calculations)
+int selected_r = -1;					// Selected robot
 
 // GUI variables
 float mouse_start_x, mouse_start_y, mouse_last_x, mouse_last_y;
-float mouse_x, mouse_y;
+float3 mouse_world;
 int mb = -1;							// Mouse variables
 
 float rotate_x0, rotate_y0;				// Variables for camera view transform
@@ -92,7 +91,7 @@ void createVBO(GLuint* vbo);
 void deleteVBO(GLuint* vbo, struct cudaGraphicsResource ** vbo_res);
 static void display(void);
 void screenToWorld(float3 screen, float3 *world);
-void worldToScreen(float3 world, float2 *screen);
+float3 worldFromScreen(int x, int y);
 void resetCamera();
 
 // Helper functions

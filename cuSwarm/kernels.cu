@@ -130,8 +130,8 @@ void launchInitKernel(Parameters p, struct cudaGraphicsResource **vbo_resource)
 	cudaGraphicsUnmapResources(1, vbo_resource, 0);
 }
 
-void launchMainKernel(float3 gh, float2 gp, uint sn, int* leaders, bool* ap,
-	Parameters p)
+void launchMainKernel(float3 gh, float2 gp, uint sn, int* leaders, int selected_r, 
+	bool* ap, Parameters p)
 {
 	// Copy leader and articulation point data to GPU
 	cudaMemcpy(d_leaders, leaders, p.num_robots * sizeof(int),
@@ -143,6 +143,7 @@ void launchMainKernel(float3 gh, float2 gp, uint sn, int* leaders, bool* ap,
 		d_positions,
 		d_velocities,
 		d_modes,
+		selected_r, 
 		gh,
 		gp,
 		d_rand_states,
@@ -169,8 +170,8 @@ void launchMainKernel(float3 gh, float2 gp, uint sn, int* leaders, bool* ap,
 	cudaDeviceSynchronize();
 }
 
-void launchMainKernel(float3 gh, float2 gp, uint sn, int* leaders, bool* ap,
-	Parameters p, struct cudaGraphicsResource **vbo_resource)
+void launchMainKernel(float3 gh, float2 gp, uint sn, int* leaders, int selected_r, 
+	bool* ap, Parameters p, struct cudaGraphicsResource **vbo_resource)
 {
 	// Map OpenGL buffer object for writing from CUDA
 	cudaGraphicsMapResources(1, vbo_resource, 0);
@@ -178,7 +179,7 @@ void launchMainKernel(float3 gh, float2 gp, uint sn, int* leaders, bool* ap,
 	cudaGraphicsResourceGetMappedPointer((void **)&d_positions, &num_bytes,
 		*vbo_resource);
 
-	launchMainKernel(gh, gp, sn, leaders, ap, p);
+	launchMainKernel(gh, gp, sn, leaders, selected_r, ap, p);
 
 	// Unmap OpenGL buffer object
 	cudaGraphicsUnmapResources(1, vbo_resource, 0);
@@ -282,7 +283,7 @@ __global__ void init_kernel(float4* pos, float3* vel, int* mode,
 
 	// Set the initial color
 	Color color;
-	setColor(&(color.components), 1, false, i, p);
+	setColor(&(color.components), 1, false, false, i, p);
 
 	// Set speed manually from params.txt
 	float speed = p.vel_bound / 60.0f;
@@ -329,15 +330,15 @@ __global__ void side_kernel(float4* pos, int* mode, int* leaders,
 				my_mode = p.hops + 1;
 				my_nearest_leader = -1;
 				// Assign as non-leader for 1 second +/- (0-1/2) second
-				leader_countdown[i] = 60 +
-					static_cast<int>(curand_uniform(&local_state) * 30.0f);
+				leader_countdown[i] = 30 +
+					static_cast<int>(curand_uniform(&local_state) * 15.0f);
 			}
 			if (my_mode > 0) {
 				my_mode = 0;
 				my_nearest_leader = i;
 				// Assign as a leader for 2 seconds +/- (0-1) second
-				leader_countdown[i] = 120 +
-					static_cast<int>(curand_uniform(&local_state) * 60.0f);
+				leader_countdown[i] = 60 +
+					static_cast<int>(curand_uniform(&local_state) * 30.0f);
 			}
 		}
 
@@ -419,7 +420,7 @@ __global__ void side_kernel(float4* pos, int* mode, int* leaders,
 	laplacian[(i * p.num_robots) + i] = degree;
 }
 
-__global__ void main_kernel(float4* pos, float3* vel, int* mode,
+__global__ void main_kernel(float4* pos, float3* vel, int* mode, int selected_r, 
 	float3 goal_heading, float2 goal_point, curandState* rand_state, bool* ap,
 	float2* flow_pos, float2* flow_dir, bool* occupancy, Parameters p, uint sn)
 {
@@ -501,9 +502,6 @@ __global__ void main_kernel(float4* pos, float3* vel, int* mode,
 					case 2:
 						disperse(dist3, &repel, &cohere, s_ap[ti], p);
 						break;
-					case 3:
-						rendezvousToPoint(dist3, &repel, p);
-						break;
 					}
 				}
 			}
@@ -524,13 +522,6 @@ __global__ void main_kernel(float4* pos, float3* vel, int* mode,
 		break;
 	case 2:
 		break;
-	case 3:
-		// Set align vector to point toward goal point
-		float align_angle = atan2f(goal_point.y - myPos.y,
-			goal_point.x - myPos.x);
-		align.x = cosf(align_angle);
-		align.y = sinf(align_angle);
-		break;
 	}
 
 	// If velocity is affected by random flows, calculate flow effect here
@@ -544,12 +535,22 @@ __global__ void main_kernel(float4* pos, float3* vel, int* mode,
 		}
 	}
 
-	// Scale all component vectors to their weights and compute goal vector
-	rescale(&repel, p.repel_weight, false);
+	// Scale repel and cohere vectors according to leader status (leaders have 
+	// half weight)
+	if (myMode == 0) {
+		rescale(&repel, p.repel_weight * 0.5f, false);
+		rescale(&cohere, p.cohere_weight * 0.5f, false);
+	}
+	else {
+		rescale(&repel, p.repel_weight, false);
+		rescale(&cohere, p.cohere_weight, false);
+	}
+	// Align vector weight is fixed
 	rescale(&align, p.align_weight, false);
-	rescale(&cohere, p.cohere_weight, false);
-	rescale(&avoid, 4.0f * powf((p.range_o - dist_to_obstacle), 4.0f), false);
-	// Add random currents, if applicable
+	// Obstacle avoidance vector
+	rescale(&avoid, 4.0f * powf((p.range_o - dist_to_obstacle), 2.0f), false);
+
+	// Add random currents, if enabled
 	if (p.current > 0.0f) {
 		rescale(&flow, p.current, false);
 	}
@@ -558,9 +559,10 @@ __global__ void main_kernel(float4* pos, float3* vel, int* mode,
 	goal.x = repel.x + align.x + cohere.x + avoid.x + flow.x;
 	goal.y = repel.y + align.y + cohere.y + avoid.y + flow.y;
 
-	// Cap the angular velocity
+	// Cap the angular velocity at max bound
 	capAngularVelocity(make_float2(vel[i].x, vel[i].y),
 		&goal, p.ang_bound / 60.0f);
+
 	// Rescale the goal to the calculated speed
 	rescale(&goal, mySpeed, true);
 
@@ -569,10 +571,10 @@ __global__ void main_kernel(float4* pos, float3* vel, int* mode,
 
 	// Set the color based on current mode
 	Color color;
-	setColor(&(color.components), myMode, ap[i], i, p);
+	setColor(&(color.components), myMode, selected_r == i, ap[i], i, p);
+
 	// Update velocity
 	vel[i] = make_float3(goal.x, goal.y, mySpeed);
-
 	// Update position
 	pos[i] = make_float4(myPos.x + vel[i].x, myPos.y + vel[i].y, 0.0f, color.c);
 
@@ -606,25 +608,24 @@ __device__ void flock(int myMode, float3 nVel, int nMode, float3 dist3,
 	float2* repel, float2* align, float2* cohere, bool is_ap, Parameters p)
 {
 	// Main flocking section
-	if (dist3.z <= p.range) {
+	if (dist3.z <= p.range_f) {
 		// REPEL
 		// Robots repel from neighbors within flocking repel range
-		float weight = powf(p.range - dist3.z, 4.0f);
+		float weight = powf(p.range_f - dist3.z, 2.0f);
 		repel->x -= weight * dist3.x;
 		repel->y -= weight * dist3.y;
 	}
 	if (myMode != 0) {
 		// ALIGN
 		float weight;
-		(nMode == 0) ? weight = 1000.0f : weight = 1.0f;
+		(nMode == 0) ? weight = 10.0f : weight = 1.0f;
 		align->x += weight * nVel.x;
 		align->y += weight * nVel.y;
 	}
-	if (dist3.z < p.range) {
+	if (dist3.z < p.range && dist3.z > p.range_f) {
 		// COHERE
 		// Do not cohere to neighbors within repel range
-		float weight = powf(dist3.z, 4.0f);
-		//(is_ap) ? weight = 1000.0f : weight *= 1.0f;
+		float weight = powf(dist3.z - p.range_f, 2.0f);
 		cohere->x += weight * dist3.x;
 		cohere->y += weight * dist3.y;
 	}
@@ -648,17 +649,6 @@ __device__ void disperse(float3 dist3, float2* repel, float2* cohere, bool is_ap
 		float weight = powf(dist3.z - p.range_d, 3.0f);
 		cohere->x += weight * dist3.x;
 		cohere->y += weight * dist3.y;
-	}
-}
-
-__device__ void rendezvousToPoint(float3 dist3, float2* repel, Parameters p)
-{
-	if (dist3.z <= p.range_r) {
-		// REPEL
-		// Repel from robots within repel range
-		float weight = powf(p.range_r - dist3.z, 2.0f);
-		repel->x -= weight * dist3.x;
-		repel->y -= weight * dist3.y;
 	}
 }
 
@@ -711,38 +701,43 @@ __device__ bool checkOccupancy(float x, float y, bool* occupancy, Parameters p)
 	}
 }
 
-__device__ void setColor(uchar4* color, int mode, bool is_ap, uint i,
-	Parameters p)
+__device__ void setColor(uchar4* color, int mode, bool selected, bool is_ap, 
+	uint i, Parameters p)
 {
 	if (p.show_leaders_only && mode == 0 || !p.show_leaders_only) {
 		if (p.show_mode) {
 			switch (mode) {
-			case 0:
+			case 0:	// Red
 				*color = make_uchar4(255, 0, 0, 255);
 				break;
-			case 1:
+			case 1:	// Green
 				*color = make_uchar4(0, 200, 0, 255);
 				break;
-			case 2:
+			case 2:	// Blue
 				*color = make_uchar4(100, 100, 255, 255);
 				break;
-			case 3:
+			case 3:	// Yellow
 				*color = make_uchar4(200, 200, 50, 255);
 				break;
-			case 4:
+			case 4:// Cyan
 				*color = make_uchar4(50, 200, 200, 255);
 				break;
-			default:
+			default:// Gray
 				*color = make_uchar4(100, 100, 100, 255);
 				break;
 			}
 		}
-		else {
+		else {		// White
 			*color = make_uchar4(255, 255, 255, 255);
 		}
 	}
-	else {
+	else {			// Black
 		*color = make_uchar4(0, 0, 0, 0);
+	}
+
+	// Highlight if selected
+	if (selected) {	// Magenta
+		*color = make_uchar4(200, 75, 200, 255);
 	}
 }
 

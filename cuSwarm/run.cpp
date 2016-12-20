@@ -33,30 +33,36 @@ void drawInterface(float window_width, float window_height)
 	// Draw filled polygons
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	// Draw explored grid cells on the GUI
+	// Draw explored grid cells on the GUI - can be turned off in parameters
 	if (p.show_explored) {
 		for (uint i = 0; i < p.world_size * p.world_size; i++) {
+
 			// Get the world coordinates for this iteration
 			float world_x = -world_size_2 +
 				static_cast<float>(floor(i / p.world_size));
 			float world_y = -world_size_2 + static_cast<float>(i % p.world_size);
 
 			// Now draw the grid cell if explored
-			float explored_color = 0.0f;
+			float saturation = 0.0f;
 			if (explored_grid[i] != 0) {
-				explored_color = fabsf(static_cast<float>(explored_grid[i]) /
+
+				// Get saturation value of color (more saturated = more explored)
+				saturation = fabsf(static_cast<float>(explored_grid[i]) /
 					p.max_explore);
+
 				// Color is based on obstacle/free space
 				if (explored_grid[i] > 0) {		// Free space
-					glColor4f(0.1f * explored_color, 0.3f * explored_color,
-						0.6f * explored_color, 0.5f);
+					glColor4f(0.1f * saturation, 0.3f * saturation,
+						0.6f * saturation, 0.5f);
 				}
 				else {							// Obstacle
 					// Lower bar for showing an obstacle cell as fully explored
-					explored_color = min(1.0f, explored_color * 4.0f);
-					glColor4f(0.6f * explored_color, 0.2f * explored_color,
-						0.2f * explored_color, 1.0f);
+					saturation = min(1.0f, saturation * 4.0f);
+					glColor4f(0.6f * saturation, 0.2f * saturation,
+						0.2f * saturation, 1.0f);
 				}
+
+				// Draw cell
 				glBegin(GL_POLYGON);
 				glVertex3f(world_x, world_y, -0.2f);
 				glVertex3f(world_x + 1.0f, world_y, -0.2f);
@@ -83,9 +89,11 @@ void drawInterface(float window_width, float window_height)
 
 		// Change target color based on whether fully explored
 		if (target_color < 1.0f) {
+
 			// Purple (not fully explored)
 			glColor4f(0.6f * target_color, 0.0f * target_color,
 				0.6f * target_color, 1.0f);
+
 			// If first time target is seen, indicate so in target data field, 
 			// and add to targets_seen count
 			if (target_color > 0.0f && targets[i].z == 0) {
@@ -116,9 +124,23 @@ void drawInterface(float window_width, float window_height)
 		glEnd();
 	}
 
+	// Draw coordinates of selected robot
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+	if (selected_r != -1) {
+		glBegin(GL_LINES);
+		glVertex3f(-1000.0f, positions[selected_r].y, 0.0f);
+		glVertex3f(1000.0f, positions[selected_r].y, 0.0f);
+		glEnd();
+		glBegin(GL_LINES);
+		glVertex3f(positions[selected_r].x, -1000.0f, 0.0f);
+		glVertex3f(positions[selected_r].x, 1000.0f, 0.0f);
+		glEnd();
+	}
+
 	// Set color to white for next GUI elements
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
+	// Reset view matricies
 	glResetModelAndProjection();
 
 	// Draw progress bar for time remaining
@@ -277,6 +299,7 @@ void mouse(int button, int state, int x, int y)
 	// If the button is pressed down (ignore subsequent buttons before the first
 	// is released)
 	if (state == GLUT_DOWN && mb == -1) {
+
 		// Get mouse button
 		mb = button;
 
@@ -289,29 +312,19 @@ void mouse(int button, int state, int x, int y)
 				mouse_last_x = mouse_start_x;
 				mouse_last_y = mouse_start_y;
 			}
-			else if (mb == 2) {
-				p.behavior = 3;
-				p.align_weight = 1.0f;
-				// Set goal point to swarm's center of mass
-				for (uint i = 0; i < p.num_robots; i++) {
-					goal_point.x += positions[i].x;
-					goal_point.y += positions[i].y;
-				}
-				goal_point.x /= p.num_robots;
-				goal_point.y /= p.num_robots;
-			}
 		}
+
 		if (mb == 3) {		// Scroll wheel forward
-			translate_z0 -= 1.0f;
-			translate_z0 = min(translate_z0, 200.0f);
+			translate_z0 -= 5.0f;
 		}
 		else if (mb == 4) {		// Scroll wheel backward
-			translate_z0 += 1.0f;
-			translate_z0 = max(translate_z0, 10.0f);
+			translate_z0 += 5.0f;
 		}
 	}
 	else if (state == GLUT_UP && mb == button) {	// If the button is released
-		if (mb == 0) { // Primary or seconday mouse button
+
+		if (mb == 0) {		// Left mouse button
+
 			// If the simulation is paused, unpause it; 
 			// else log the new user goal heading and log the information; 
 			if (paused) {
@@ -326,7 +339,7 @@ void mouse(int button, int state, int x, int y)
 					static_cast<float>(x)-mouse_start_x);
 				// Transform this into a 2D unit vector (float3, but z not used)
 				goal_vector = make_float3(cosf(goal_heading),
-					-sinf(goal_heading), 0.0f);
+					-sinf(goal_heading), p.vel_bound);
 
 				// Clear the user-drawn line data points
 				mouse_start_x = 0;
@@ -335,14 +348,36 @@ void mouse(int button, int state, int x, int y)
 				mouse_last_y = 0;
 			}
 		}
-		else if (mb == 5) { // Scroll wheel forward
-			translate_z0 -= 1.0f;
-			translate_z0 = min(translate_z0, 200.0f);
+		else if (mb == 2) {	// Right mouse button
+			// Get world coordinates of mouse location
+			mouse_world = worldFromScreen(x, y);
+
+			// Get nearest robot
+			int closest_i = -1;
+			float closest_d = FLT_MAX;
+			for (uint i = 0; i < p.num_robots; i++) {
+				float dist = eucl2(positions[i].x, positions[i].y, mouse_world.x,
+					mouse_world.y);
+				if (dist < closest_d) {
+					closest_i = i;
+					closest_d = dist;
+				}
+			}
+
+			// Set selected robot
+			selected_r = closest_i;
+			printf("Selected: %d\n", selected_r);
 		}
-		else if (mb == 6) { // Scroll wheel backward
-			translate_z0 += 1.0f;
-			translate_z0 = max(translate_z0, 10.0f);
+		else if (mb == 5) { // Scroll wheel forward (with left mouse button)
+			translate_z0 -= 5.0f;
 		}
+		else if (mb == 6) { // Scroll wheel backward (with left mouse button)
+			translate_z0 += 5.0f;
+		}
+
+		// Cap the zoom value
+		translate_z0 = min(p.world_size, translate_z0);
+		translate_z0 = max(10.0f, translate_z0);
 
 		// If mouse_up event cause by scrolling while left mouse is down, reset 
 		// mb to 0 (left click); else, reset to null
@@ -363,10 +398,6 @@ void motion(int x, int y)
 		mouse_last_x = static_cast<float>(x);
 		mouse_last_y = static_cast<float>(y);
 	}
-
-	// Assign current mouse coordinates
-	mouse_x = static_cast<float>(x);
-	mouse_y = static_cast<float>(y);
 }
 
 void moveUp()
@@ -406,6 +437,7 @@ void initGL(int argc, char **argv)
 {
 	glutInit(&argc, argv);
 
+	// Maximize screen if not otherwise specified
 	if (p.window_width == 0 || p.window_height == 0) {
 		p.window_width = glutGet(GLUT_SCREEN_WIDTH);
 		p.window_height = glutGet(GLUT_SCREEN_HEIGHT);
@@ -424,6 +456,7 @@ void initGL(int argc, char **argv)
 	{
 		std::printf("!!! Failed FindWindow\n");
 	}
+
 	// Maximize the window for full screen simulation operation
 	SetWindowLong(win_handle, GWL_STYLE, (GetWindowLong(win_handle, GWL_STYLE) | 
 		WS_MAXIMIZE));
@@ -551,22 +584,23 @@ static void display(void)
 	// Draw filled polygons
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	// Draw robot data
+	// Draw robot data - these can be turned off and on in the settings
 	for (uint i = 0; i < p.num_robots; i++) {
 
 		// Orientation lines
-		if ((p.show_leaders_only && modes[i] == 0) || (!p.show_leaders_only)) {
+		if (p.show_headings && ((p.show_leaders_only && modes[i] == 0) || 
+				(!p.show_leaders_only))) {
 			glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
 			glLineWidth(2.0f);
 			glBegin(GL_LINES);
 			glVertex3f(positions[i].x, positions[i].y, 0.0f);
-			glVertex3f(positions[i].x + ((100.0f * velocities[i].x) / 
-				p.vel_bound), positions[i].y + ((100.0f * velocities[i].y) / 
+			glVertex3f(positions[i].x + ((50.0f * velocities[i].x) / 
+				p.vel_bound), positions[i].y + ((50.0f * velocities[i].y) / 
 				p.vel_bound), 0.1f);
 			glEnd();
 		}
 
-		glColor4f(1.0f, 1.0f, 1.0f, 0.1f);
+		glColor4f(1.0f, 1.0f, 1.0f, 0.2f);
 		glLineWidth(1.0f);
 
 		// Communication connections
@@ -584,7 +618,7 @@ static void display(void)
 			}
 		}
 
-		// Show communication range if specified in parameters
+		// Communication range
 		if (p.show_range || (p.show_range_leaders && modes[i] == 0)) {
 			glColor4f(1.0f, 1.0f, 1.0f, 0.2f);
 			drawEllipse(positions[i].x, positions[i].y, p.range, p.range, -0.1f, 
@@ -632,30 +666,33 @@ void screenToWorld(float3 screen, float3 *world)
 	world->z = static_cast<float>(z_w);
 }
 
-void worldToScreen(float3 world, float3 *screen)
+float3 worldFromScreen(int x, int y)
 {
 	// Transform matricies
 	GLint viewport[4];
 	GLdouble modelview[16];
 	GLdouble projection[16];
+
 	// Screen and world coordinates
-	GLdouble x_s, y_s, z_s;
-	GLdouble x_w, y_w, z_w;
+	GLfloat s_x, s_y, s_z;
+	GLdouble w_x, w_y, w_z;
 
 	// Get view matrix data and viewport bounds
 	glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 	glGetDoublev(GL_PROJECTION_MATRIX, projection);
 	glGetIntegerv(GL_VIEWPORT, viewport);
 
-	// Get world coordinates
-	x_w = static_cast<double>(world.x);
-	y_w = static_cast<double>(world.y);
-	z_w = static_cast<double>(world.z);
+	// Get screen coordinates
+	s_x = static_cast<float>(x);
+	s_y = static_cast<float>(viewport[3]) - static_cast<float>(y);
+	glReadPixels(x, static_cast<int>(s_y), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, 
+		&s_z);
 
-	gluProject(x_w, y_w, z_w, modelview, projection, viewport, &x_s, &y_s, &z_s);
-	screen->x = static_cast<float>(x_s);
-	screen->y = static_cast<float>(y_s);
-	screen->z = 0.0f; //static_cast<float>(z_s);
+	gluUnProject(s_x, s_y, s_z, modelview, projection, viewport, 
+		&w_x, &w_y, &w_z);
+
+	return make_float3(static_cast<float>(w_x), static_cast<float>(w_y), 
+		static_cast<float>(w_z));
 }
 
 void resetCamera()
@@ -663,7 +700,7 @@ void resetCamera()
 	// Reset the camera to the start position
 	translate_x0 = 0.0f;
 	translate_y0 = 0.0f;
-	translate_z0 = 100.0f;
+	translate_z0 = 200.0f;
 	rotate_x0 = 0.0f;
 	rotate_y0 = 0.0f;
 }
@@ -780,6 +817,8 @@ void processParam(std::vector<std::string> tokens)
 		p.show_mode = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_leaders_only")
 		p.show_leaders_only = (std::stoul(tokens[1]) != 0);
+	else if (tokens[0] == "show_headings")
+		p.show_headings = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_range")
 		p.show_range = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_range_leaders")
@@ -806,13 +845,13 @@ void generateWorld()
 {
 	// Create the specified number of obstacles in the parameters file
 	for (uint i = 0; i < p.num_obstacles; i++) {
-		bool obstacle_accepted = false;
 
 		// Generate obstacles, discarding ones that don't fit the criteria
+		bool obstacle_accepted = false;
 		while (!obstacle_accepted) {
-			float4 obstacle = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 
 			// Create width and height for the obstacle
+			float4 obstacle = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 			obstacle.z = static_cast<float>(rand() % p.max_obstacle_size);
 			obstacle.w = static_cast<float>(rand() % p.max_obstacle_size);
 			// Create x, y position for top left corner of rectangular obstacle
@@ -828,6 +867,7 @@ void generateWorld()
 				obstacle.y < -(p.start_size + 1.0f) - obstacle.w || 
 				obstacle.y > (p.start_size + 1.0f)) &&
 				(obstacle.z > 3.0f && obstacle.w > 3.0f)) {
+
 				// Signal the obstacle fits criteria
 				obstacle_accepted = true;
 				// Add this to the list of obstacles
@@ -838,10 +878,12 @@ void generateWorld()
 
 	// Create the specified number of targets in the parameters file
 	for (uint i = 0; i < p.targets; i++) {
-		bool target_accepted = false;
 
-		// Generate targets, discarding ones that are within obstacles
+		// Discard targets within obstacles
+		bool target_accepted = false;
 		while (!target_accepted) {
+
+			// Generate new random target
 			int3 target = make_int3(0, 0, 0);
 			float x = rand() % (p.world_size) - (p.world_size / 2.0f);
 			float y = rand() % (p.world_size) - (p.world_size / 2.0f);
@@ -892,8 +934,10 @@ void updateExplored()
 
 	// Update explored grid values
 	for (uint i = 0; i < p.world_size * p.world_size; i++) {
+
 		// Skip cells that are fully explored
 		if (abs(explored_grid[i]) < static_cast<int>(p.max_explore)) {
+
 			// Get the world coordinates for this iteration
 			float world_x = -world_size_2 + 
 				static_cast<float>(floor(i / p.world_size));
@@ -905,10 +949,12 @@ void updateExplored()
 				(world_x < data.bounds.y + p.range) &&
 				(world_y > data.bounds.z - p.range) &&
 				(world_y < data.bounds.w + p.range) && !paused) {
+
 				// Check each robot to see if it is within range of this cell
 				for (uint n = 0; n < p.num_robots; n++) {
 					if (eucl2(world_x + 0.5f, world_y + 0.5f,
 						positions[n].x, positions[n].y) <= p.range) {
+
 						// Increment/decrement based on whether cell is obstacle
 						if (explored_grid[i] >= 0) {
 							explored_grid[i]++;
@@ -920,14 +966,11 @@ void updateExplored()
 				}
 
 				// Restrict the absolute value of explored value to p.max_explore
-				if (explored_grid[i] > 0) {
+				(explored_grid[i] > 0) ? 
 					explored_grid[i] = min(explored_grid[i],
-						static_cast<int>(p.max_explore));
-				}
-				else {
+						static_cast<int>(p.max_explore)) : 
 					explored_grid[i] = max(explored_grid[i],
 						static_cast<int>(p.max_explore) * -1);
-				}
 			}
 		}
 	}
@@ -944,8 +987,6 @@ void exitSimulation()
 	cudaFree(velocities);
 	cudaFree(modes);
 	cudaFree(leaders);
-	cudaFree(nearest_leaders);
-	cudaFree(leader_countdowns);
 	cudaFree(obstacles);
 
 	// Free non-CUDA variables
@@ -978,10 +1019,9 @@ void printDataHeader()
 {
 	if (p.log_data) {
 		// Step data header
-		fprintf(output_f, "step_num behavior behavior_data failure_data ");
-		fprintf(output_f, "velocity avg_heading heading_var centroid_x ");
-		fprintf(output_f, "centroid_y convex_hull_area connectivity ");
-		fprintf(output_f, "explored_area\n");
+		fprintf(output_f, "step_num behavior failure_data velocity ");
+		fprintf(output_f, "avg_heading heading_var centroid_x centroid_y ");
+		fprintf(output_f, "convex_hull_area connectivity explored_area\n");
 	}
 }
 
@@ -993,8 +1033,10 @@ static void step(int value)
 {
 	// Only perform a step if not paused
 	if (!paused) {
+
 		// Create the output file for logging
-		if (!initial_passed) {
+		if (!init_passed) {
+
 			// Print the data column headers
 			if (p.log_data) {
 				fopen_s(&output_f, output_fname.str().c_str(), "w");
@@ -1006,12 +1048,12 @@ static void step(int value)
 				&data, p);
 
 			// Indicates inital state has passed
-			initial_passed = true;
+			init_passed = true;
 		}
 
 		// Launch the main kernel to perform one simulation step
-		launchMainKernel(goal_vector, goal_point, step_num, leaders, ap, p, 
-				&cuda_vbo_resource);
+		launchMainKernel(goal_vector, goal_point, step_num, leaders, selected_r, 
+			ap, p, &cuda_vbo_resource);
 
 		// Retrieve data from GPU (kernels.cu)
 		getData(p.num_robots, positions, velocities, modes);
@@ -1019,7 +1061,7 @@ static void step(int value)
 		if (p.show_explored) {
 			updateExplored();
 		}
-		// Get data variables (data_ops.h)
+		// Process data to get global swarm information (data_ops.h)
 		processData(positions, velocities, explored_grid, laplacian, ap, &data, 
 			p);
 
@@ -1037,10 +1079,10 @@ static void step(int value)
 			(is_in_ch) ? leaders[i] = 0 : leaders[i] = 1;
 		}
 
+		// Write data to the output log at the end of every step
 		if (p.log_data) {
-			// Write data to the output log at the end of every step
-			fprintf(output_f, "%d %d %f %f %f %f %f %f %f %f %f %d\n",
-				step_num, p.behavior, -goal_heading, -goal_heading_err, 
+			fprintf(output_f, "%d %d %f %f %f %f %f %f %f %f %d\n",
+				step_num, p.behavior, -goal_heading, 
 				p.vel_bound, data.heading_avg, data.heading_var, data.centroid.x, 
 				data.centroid.y, data.ch_area, data.connectivity, data.explored);
 		}
@@ -1084,8 +1126,6 @@ int main(int argc, char** argv)
 	cudaHostAlloc(&velocities, p.num_robots * sizeof(float3), 0);
 	cudaHostAlloc(&modes, p.num_robots * sizeof(float4), 0);
 	cudaHostAlloc(&leaders, p.num_robots * sizeof(int), 0);
-	cudaHostAlloc(&nearest_leaders, p.num_robots * sizeof(int), 0);
-	cudaHostAlloc(&leader_countdowns, p.num_robots * sizeof(uint), 0);
 	cudaHostAlloc(&laplacian, p.num_robots * p.num_robots * sizeof(int), 0);
 	cudaHostAlloc(&obstacles, p.num_obstacles * sizeof(float4), 0);
 	// Fill the leader list with -1 initially

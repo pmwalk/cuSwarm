@@ -1,81 +1,118 @@
-	# Weight given to the align vector
+# Weight given to the align vector
 align_weight 1.0
-	# Maximum angular velocity of robots (rad/s)
-ang_bound 6.28318530717
-	# Control law set to use:
-	#     0 = rendezvous
-	#     1 = flocking
-	#     2 = dispersion
+
+# Maximum angular velocity of robots (rad/s)
+ang_bound 12.5663706143
+
+# Control law set to use:
+#     0 = rendezvous
+#     1 = flocking
+#     2 = dispersion
 behavior 1
-	# Weight given to the align vector
-cohere_weight 1.0
-	# Require key press in console to complete exit
+
+# Weight given to the align vector
+cohere_weight 1.2
+
+# Require key press in console to complete exit
 confirm_quit 0
-	# Strength of random currents in environment (0.0 = no currents)
+
+# Strength of random currents in environment (0.0 = no currents)
 current 0.0
-	# Number of hops used in RCC leader selection mode
+
+# Number of hops used in RCC leader selection mode
 hops 2
-	# Leader selection mode to be used by the swarm:
-	#     0 = RCC selection
-	#     1 = Convex hull selection (not yet working)
+
+# Leader selection mode to be used by the swarm:
+#     0 = RCC selection
+#     1 = Convex hull selection (not yet working)
 leader_selection 0
-	# Logging toggle (saves swarm data to output.txt; world data to world.txt)
+
+# Logging toggle (saves swarm data to output.txt; world data to world.txt)
 log_data 1
-	# Different ranges used by the robot (max_d is maximum range), see behavior 
-	# kernels (rendezvous, flock, disperse) for more details
-range_r 3.0			# Rendezvous repel range
-range_f 3.5			# Flocking repel/cohere divide
-range_d	5.0			# Disperse repel range
+
+# Different ranges used by the robot (max_d is maximum range), see behavior 
+# kernels (rendezvous, flock, disperse) for more details
+range_r 2.0 		# Range used for rendezvous
+range_f 3.0			# Range used for flocking
+range_d	5.0			# Range used for dispersion
 range_o 2.1			# Obstacle avoidance range
-range_l 4.0			# RCC leader hop range
-range 4.0			# Maximum obstacle detection range
-	# Number of sightings a cell or target needs to reach before fully epxlored
-	# (sighting = within range of a robot during a step)
+range_l 6.0			# RCC leader hop range
+range 6.0			# Maximum obstacle detection range
+
+# Number of sightings a cell or target needs to reach before fully epxlored
+# (sighting = within range of a robot during a step)
 max_explore 300
-	# Max x or y dimension of an obstacle
+
+# Max x or y dimension of an obstacle
 max_obstacle_size 25
-	# Number of obstacles present in the environment
+
+# Number of obstacles present in the environment
 num_obstacles 0
-	# Number of robots in simulation (works best as power of 2)
-num_robots 1024
-	# Size of robots in GUI
+
+# Number of robots in simulation (works best as power of 2)
+num_robots 2048
+
+# Size of robots in GUI
 point_size 15
-	# Weight given to the align vector
-repel_weight 1.2
-	# Get connectivity value
+
+# Weight given to the align vector
+repel_weight 1.4
+
+# Get connectivity value
 get_connectivity 0
-	# Get articulation points
+
+# Get articulation points
 get_ap 0
-	# Show articulation points
+
+# Show articulation points
 show_ap 0
-	# Show robot comm connections
-show_connections 0
-	# Show convex hull
-show_convex_hull 0
-	# Show explored area
+
+# Show robot comm connections
+show_connections 1
+
+# Show convex hull
+show_convex_hull 1
+
+# Show explored area
+# WARNING: SIGNIFICANTLY SLOWS SIMULATION FOR LARGER SWARMS
 show_explored 0
-	# Show leaders only
+
+# Show leaders only
 show_leaders_only 0
-	# Show the modes of the robots
-show_mode 1
-	# Show communication range
+
+# Show orientation lines
+show_headings 0
+
+# Show the modes of the robots
+show_mode 0
+
+# Show communication range
 show_range 0
-	# Show communication range of leaders
+
+# Show communication range of leaders
 show_range_leaders 0
-	# Size of the starting space (robot spawn and obstacle-free)
+
+# Size of the starting space (robot spawn and obstacle-free)
 start_size 40.0
-	# Number of steps before simulation automatically closes (60 steps/sec during) 
-	# GUI mode
+
+# Number of steps before simulation automatically closes (60 steps/sec during) 
+# GUI mode
 step_limit 72000
-	# Number of targets in the environment
+
+# Number of targets in the environment
 targets 0
-	# Training mode
+
+# Training mode
 training 1
-	# Velocity bound of the robots in m/s (one cell = one meter)
-vel_bound 3.0
-	# Initial window height of GUI (depricated)
+
+# Velocity bound of the robots in m/s (one cell = one meter)
+vel_bound 4.0
+
+# Initial window height of GUI (depricated)
 window_height 0
-	# Initial window width of GUI (depricated)
+
+# Initial window width of GUI (depricated)
 window_width 0
-	# Size of simulation environment (meters)
-world_size 200
+
+# Size of simulation environment (meters)
+world_size 1000

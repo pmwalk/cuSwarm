@@ -66,6 +66,7 @@ struct Parameters
 	bool show_convex_hull;
 	bool show_explored;
 	bool show_leaders_only;
+	bool show_headings;
 	bool show_mode;
 	bool show_range;
 	bool show_range_leaders;
