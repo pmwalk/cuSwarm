@@ -101,6 +101,7 @@ void processParam(std::vector<std::string> tokens);
 void generateWorld();
 void calculateOccupancyGrid();
 bool checkCollision(float x, float y);
+int closestRobotToPoint(float x, float y, float z);
 void updateExplored();
 void exitSimulation();
 void printDataHeader();

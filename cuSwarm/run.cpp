@@ -217,11 +217,11 @@ void drawText(float x, float y, const unsigned char *string, GLfloat r,
 	GLfloat g, GLfloat b)
 {
 	// Change to specified color
-	glColor4f(r, g, b, 0.75f);
+	glColor4f(r, g, b, 0.25f);
 
 	// Draw text at the given point
-	glRasterPos2f(-134.0f + translate_x0, 70.0f + translate_y0);
-	glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, string);
+	glRasterPos2f(x, y);
+	glutBitmapString(GLUT_BITMAP_HELVETICA_10, string);
 }
 
 void keyboard(unsigned char key, int x, int y)
@@ -352,20 +352,9 @@ void mouse(int button, int state, int x, int y)
 			// Get world coordinates of mouse location
 			mouse_world = worldFromScreen(x, y);
 
-			// Get nearest robot
-			int closest_i = -1;
-			float closest_d = FLT_MAX;
-			for (uint i = 0; i < p.num_robots; i++) {
-				float dist = eucl2(positions[i].x, positions[i].y, mouse_world.x,
-					mouse_world.y);
-				if (dist < closest_d) {
-					closest_i = i;
-					closest_d = dist;
-				}
-			}
-
-			// Set selected robot
-			selected_r = closest_i;
+			// Set the closest robot to the mouse point as selected
+			selected_r = closestRobotToPoint(mouse_world.x, mouse_world.y,
+				mouse_world.z);
 			printf("Selected: %d\n", selected_r);
 		}
 		else if (mb == 5) { // Scroll wheel forward (with left mouse button)
@@ -588,8 +577,7 @@ static void display(void)
 	for (uint i = 0; i < p.num_robots; i++) {
 
 		// Orientation lines
-		if (p.show_headings && ((p.show_leaders_only && modes[i] == 0) || 
-				(!p.show_leaders_only))) {
+		if (p.show_headings) {
 			glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
 			glLineWidth(2.0f);
 			glBegin(GL_LINES);
@@ -607,25 +595,28 @@ static void display(void)
 		if (p.show_connections) {
 			for (uint j = i + 1; j < p.num_robots; j++) {
 				if (laplacian[(i * p.num_robots) + j] == -1) {
-					if ((p.show_leaders_only && modes[i] == 0 && modes[j] == 0) 
-							|| (!p.show_leaders_only)) {
-						glBegin(GL_LINES);
-						glVertex3f(positions[i].x, positions[i].y, 0.0f);
-						glVertex3f(positions[j].x, positions[j].y, 0.0f);
-						glEnd();
-					}
+					glBegin(GL_LINES);
+					glVertex3f(positions[i].x, positions[i].y, 0.0f);
+					glVertex3f(positions[j].x, positions[j].y, 0.0f);
+					glEnd();
 				}
 			}
 		}
 
 		// Communication range
-		if (p.show_range || (p.show_range_leaders && modes[i] == 0)) {
+		if (p.show_range) {
 			glColor4f(1.0f, 1.0f, 1.0f, 0.2f);
 			drawEllipse(positions[i].x, positions[i].y, p.range, p.range, -0.1f, 
 				false);
 			glColor4f(0.5f, 0.5f, 0.5f, 0.1f);
 			drawEllipse(positions[i].x, positions[i].y, p.range, p.range, -0.2f, 
 				true);
+		}
+
+		// ID numbers
+		if (p.show_ids) {
+			drawText(positions[i].x + 0.5f, positions[i].y + 0.5f, 
+			(const unsigned char*)std::to_string(i).c_str(), 100, 100, 100);
 		}
 	}
 
@@ -687,7 +678,6 @@ float3 worldFromScreen(int x, int y)
 	s_y = static_cast<float>(viewport[3]) - static_cast<float>(y);
 	glReadPixels(x, static_cast<int>(s_y), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, 
 		&s_z);
-
 	gluUnProject(s_x, s_y, s_z, modelview, projection, viewport, 
 		&w_x, &w_y, &w_z);
 
@@ -700,7 +690,7 @@ void resetCamera()
 	// Reset the camera to the start position
 	translate_x0 = 0.0f;
 	translate_y0 = 0.0f;
-	translate_z0 = 200.0f;
+	translate_z0 = 50.0f;
 	rotate_x0 = 0.0f;
 	rotate_y0 = 0.0f;
 }
@@ -815,10 +805,10 @@ void processParam(std::vector<std::string> tokens)
 		p.show_explored = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_mode")
 		p.show_mode = (std::stoul(tokens[1]) != 0);
-	else if (tokens[0] == "show_leaders_only")
-		p.show_leaders_only = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_headings")
 		p.show_headings = (std::stoul(tokens[1]) != 0);
+	else if (tokens[0] == "show_ids")
+		p.show_ids = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_range")
 		p.show_range = (std::stoul(tokens[1]) != 0);
 	else if (tokens[0] == "show_range_leaders")
@@ -925,6 +915,32 @@ bool checkCollision(float x, float y)
 		}
 	}
 	return false;
+}
+
+int closestRobotToPoint(float x, float y, float z)
+{
+	printf("Mouse: %f %f\n", x, y);
+
+	// Get nearest robot
+	int closest_i = -1;
+	float closest_d = FLT_MAX;
+	for (uint i = 0; i < p.num_robots; i++) {
+
+		// Distance from given point to this robot
+		float dist = eucl2(positions[i].x, positions[i].y, mouse_world.x,
+			mouse_world.y);
+
+		printf("Robot %d (%f %f) -- %f\n", i, positions[i].x, positions[i].y, dist);
+
+		// Update closest robot index and distance if this robot is closest
+		if (dist < closest_d) {
+			closest_i = i;
+			closest_d = dist;
+		}
+	}
+
+	printf("\n");
+	return closest_i;
 }
 
 void updateExplored()

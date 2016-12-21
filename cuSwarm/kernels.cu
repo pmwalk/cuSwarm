@@ -704,35 +704,30 @@ __device__ bool checkOccupancy(float x, float y, bool* occupancy, Parameters p)
 __device__ void setColor(uchar4* color, int mode, bool selected, bool is_ap, 
 	uint i, Parameters p)
 {
-	if (p.show_leaders_only && mode == 0 || !p.show_leaders_only) {
-		if (p.show_mode) {
-			switch (mode) {
-			case 0:	// Red
-				*color = make_uchar4(255, 0, 0, 255);
-				break;
-			case 1:	// Green
-				*color = make_uchar4(0, 200, 0, 255);
-				break;
-			case 2:	// Blue
-				*color = make_uchar4(100, 100, 255, 255);
-				break;
-			case 3:	// Yellow
-				*color = make_uchar4(200, 200, 50, 255);
-				break;
-			case 4:// Cyan
-				*color = make_uchar4(50, 200, 200, 255);
-				break;
-			default:// Gray
-				*color = make_uchar4(100, 100, 100, 255);
-				break;
-			}
-		}
-		else {		// White
-			*color = make_uchar4(255, 255, 255, 255);
+	if (p.show_mode) {
+		switch (mode) {
+		case 0:	// Red
+			*color = make_uchar4(255, 0, 0, 255);
+			break;
+		case 1:	// Green
+			*color = make_uchar4(0, 200, 0, 255);
+			break;
+		case 2:	// Blue
+			*color = make_uchar4(100, 100, 255, 255);
+			break;
+		case 3:	// Yellow
+			*color = make_uchar4(200, 200, 50, 255);
+			break;
+		case 4:// Cyan
+			*color = make_uchar4(50, 200, 200, 255);
+			break;
+		default:// Gray
+			*color = make_uchar4(100, 100, 100, 255);
+			break;
 		}
 	}
-	else {			// Black
-		*color = make_uchar4(0, 0, 0, 0);
+	else {		// White
+		*color = make_uchar4(255, 255, 255, 255);
 	}
 
 	// Highlight if selected

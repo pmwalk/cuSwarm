@@ -50,7 +50,7 @@ max_obstacle_size 25
 num_obstacles 0
 
 # Number of robots in simulation (works best as power of 2)
-num_robots 2048
+num_robots 4
 
 # Size of robots in GUI
 point_size 15
@@ -77,14 +77,14 @@ show_convex_hull 1
 # WARNING: SIGNIFICANTLY SLOWS SIMULATION FOR LARGER SWARMS
 show_explored 0
 
-# Show leaders only
-show_leaders_only 0
-
 # Show orientation lines
 show_headings 0
 
 # Show the modes of the robots
 show_mode 0
+
+# Show the IDs of robots
+show_ids 1
 
 # Show communication range
 show_range 0
@@ -93,7 +93,7 @@ show_range 0
 show_range_leaders 0
 
 # Size of the starting space (robot spawn and obstacle-free)
-start_size 40.0
+start_size 2.0
 
 # Number of steps before simulation automatically closes (60 steps/sec during) 
 # GUI mode
