@@ -37,7 +37,7 @@ float3* velocities;						// Robot velocities (x, y, z)
 int* modes;								// Robot modes
 int* leaders;							// List of current swarm leaders
 int* laplacian;							// Laplacian matrix of robot connectivity
-										// (max_a, max_b, max_c, max_d)
+										// (range, range_r, range_f, range_l)
 bool* ap;								// Articulation pts (min vertex cut set)
 float4* obstacles;						// List of obstacles in the environment
 										// (top_left_x, top_left_y, w, h)
