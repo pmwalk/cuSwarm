@@ -690,7 +690,7 @@ void resetCamera()
 	// Reset the camera to the start position
 	translate_x0 = 0.0f;
 	translate_y0 = 0.0f;
-	translate_z0 = 50.0f;
+	translate_z0 = 200.0f;
 	rotate_x0 = 0.0f;
 	rotate_y0 = 0.0f;
 }

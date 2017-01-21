@@ -4,8 +4,7 @@
 ***** VARIABLES ******
 *********************/
 
-// Device pointers for simulation agent (d_positions, etc) and planning agent 
-// (d_positions2, etc) data arrays
+// Device pointers for simulation agent data arrays
 float4* d_positions;
 float3* d_velocities;
 int* d_modes;

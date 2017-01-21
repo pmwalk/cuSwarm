@@ -8,10 +8,10 @@ ang_bound 12.5663706143
 #     0 = rendezvous
 #     1 = flocking
 #     2 = dispersion
-behavior 1
+behavior 0
 
 # Weight given to the align vector
-cohere_weight 1.2
+cohere_weight 1.0
 
 # Require key press in console to complete exit
 confirm_quit 0
@@ -20,7 +20,7 @@ confirm_quit 0
 current 0.0
 
 # Number of hops used in RCC leader selection mode
-hops 2
+hops 3
 
 # Leader selection mode to be used by the swarm:
 #     0 = RCC selection
@@ -50,13 +50,13 @@ max_obstacle_size 25
 num_obstacles 0
 
 # Number of robots in simulation (works best as power of 2)
-num_robots 4
+num_robots 256
 
 # Size of robots in GUI
 point_size 15
 
 # Weight given to the align vector
-repel_weight 1.4
+repel_weight 1.2
 
 # Get connectivity value
 get_connectivity 0
@@ -68,23 +68,23 @@ get_ap 0
 show_ap 0
 
 # Show robot comm connections
-show_connections 1
+show_connections 0
 
 # Show convex hull
-show_convex_hull 1
+show_convex_hull 0
 
 # Show explored area
 # WARNING: SIGNIFICANTLY SLOWS SIMULATION FOR LARGER SWARMS
 show_explored 0
 
 # Show orientation lines
-show_headings 0
+show_headings 1
 
 # Show the modes of the robots
-show_mode 0
+show_mode 1
 
 # Show the IDs of robots
-show_ids 1
+show_ids 0
 
 # Show communication range
 show_range 0
@@ -93,14 +93,14 @@ show_range 0
 show_range_leaders 0
 
 # Size of the starting space (robot spawn and obstacle-free)
-start_size 2.0
+start_size 30.0
 
 # Number of steps before simulation automatically closes (60 steps/sec during) 
 # GUI mode
 step_limit 72000
 
 # Number of targets in the environment
-targets 0
+targets 100
 
 # Training mode
 training 1
