@@ -36,5 +36,3 @@ Data calculations used for the simulation, output logging, and drawing certain G
 
 ---utils.cpp/utils.h---
 Utilities file
-
-Questions can be directed to Phillip Walker at pmwalk@gmail.com
