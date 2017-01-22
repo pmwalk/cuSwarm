@@ -30,8 +30,8 @@ Parameters p;							// Parameters structure
 float3 goal_vector;						// Goal vector
 float goal_heading;						// Goal bearing
 float2 goal_point;						// Goal point (for rendezvous to point)
-int* explored_grid;						// Grid covering the whole environment, 
-										// showing how explored each cell is
+int* explored_grid;						// Grid covering the whole environment, showing how 
+										//explored each cell is
 float4* positions;						// Robot positions (x, y, z, color)
 float3* velocities;						// Robot velocities (x, y, z)
 int* modes;								// Robot modes
@@ -41,8 +41,7 @@ int* laplacian;							// Laplacian matrix of robot connectivity
 bool* ap;								// Articulation pts (min vertex cut set)
 float4* obstacles;						// List of obstacles in the environment
 										// (top_left_x, top_left_y, w, h)
-int3* targets;							// List of targets in the environment
-										// (x, y, found[0 or 1])
+int3* targets;							// List of targets in the environment (x, y, found[0 or 1])
 bool* occupancy;						// Occupancy grid for the environment
 Data data;								// Data object (see data_ops.cpp for data 
 										// calculations)
@@ -73,8 +72,7 @@ std::stringstream output_fname;			// Name of the log file
 // User interface functions
 void drawInterface(float world_size, float window_width, float window_height);
 void drawEllipse(float cx, float cy, float w, float h, float z, bool fill);
-void drawText(float x, float y, const unsigned char *string, GLfloat r, 
-	GLfloat g, GLfloat b);
+void drawText(float x, float y, const unsigned char *string, GLfloat r, GLfloat g, GLfloat b);
 void keyboard(unsigned char key, int x, int y);
 void keyboardSpecial(int key, int x, int y);
 void mouse(int button, int state, int x, int y);
