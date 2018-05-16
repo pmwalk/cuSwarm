@@ -11,6 +11,7 @@
 #include <ctime>
 #include <iomanip>
 #include <queue>
+#include <iterator>
 
 // Project includes
 #include "kernels.cuh"
@@ -43,7 +44,7 @@ float4* obstacles;						// List of obstacles in the environment
 										// (top_left_x, top_left_y, w, h)
 int3* targets;							// List of targets in the environment (x, y, found[0 or 1])
 bool* occupancy;						// Occupancy grid for the environment
-Data data;								// Data object (see data_ops.cpp for data 
+Data dat;								// Data object (see data_ops.cpp for data 
 										// calculations)
 int selected_r = -1;					// Selected robot
 
@@ -70,7 +71,7 @@ std::stringstream output_fname;			// Name of the log file
 **************************************/
 
 // User interface functions
-void drawInterface(float world_size, float window_width, float window_height);
+void drawInterface(float window_width, float window_height);
 void drawEllipse(float cx, float cy, float w, float h, float z, bool fill);
 void drawText(float x, float y, const unsigned char *string, GLfloat r, GLfloat g, GLfloat b);
 void keyboard(unsigned char key, int x, int y);
@@ -85,8 +86,8 @@ void glResetModelAndProjection();
 
 // OpenGL utility functions
 void initGL(int argc, char **argv);
-void createVBO(GLuint* vbo);
-void deleteVBO(GLuint* vbo, struct cudaGraphicsResource ** vbo_res);
+void createVBO(GLuint *vbo, struct cudaGraphicsResource **vbo_res, unsigned int vbo_res_flags);
+void deleteVBO(GLuint *vbo, struct cudaGraphicsResource *vbo_res);
 static void display(void);
 void screenToWorld(float3 screen, float3 *world);
 float3 worldFromScreen(int x, int y);

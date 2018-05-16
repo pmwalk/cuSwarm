@@ -1,4 +1,7 @@
 #include "run.h"
+#include <nanogui/nanogui.h>
+
+using namespace nanogui;
 
 /*************************************
 ***** OpenGL Callback Functions ******
@@ -24,8 +27,8 @@ void drawInterface(float window_width, float window_height)
 	if (p.show_convex_hull) {
 		glColor4f(0.9f, 0.9f, 0.1f, 0.7f);
 		glBegin(GL_POLYGON);
-		for (uint i = 0; i < data.ch.size(); i++) {
-			glVertex3f(data.ch[i].x, data.ch[i].y, -0.1f);
+		for (uint i = 0; i < dat.ch.size(); i++) {
+			glVertex3f(dat.ch[i].x, dat.ch[i].y, -0.1f);
 		}
 		glEnd();
 	}
@@ -90,7 +93,7 @@ void drawInterface(float window_width, float window_height)
 			// and add to targets_seen count
 			if (target_color > 0.0f && targets[i].z == 0) {
 				targets[i].z = 1;
-				data.targets_seen++;
+				dat.targets_seen++;
 			}
 		}
 		else {
@@ -100,7 +103,7 @@ void drawInterface(float window_width, float window_height)
 			// field and add to targets_explored count
 			if (targets[i].z == 1) {
 				targets[i].z = 2;
-				data.targets_explored++;
+				dat.targets_explored++;
 			}
 		}
 
@@ -885,8 +888,6 @@ bool checkCollision(float x, float y)
 
 int closestRobotToPoint(float x, float y, float z)
 {
-	printf("Mouse: %f %f\n", x, y);
-
 	// Get nearest robot
 	int closest_i = -1;
 	float closest_d = FLT_MAX;
@@ -895,8 +896,6 @@ int closestRobotToPoint(float x, float y, float z)
 		// Distance from given point to this robot
 		float dist = eucl2(positions[i].x, positions[i].y, mouse_world.x, mouse_world.y);
 
-		printf("Robot %d (%f %f) -- %f\n", i, positions[i].x, positions[i].y, dist);
-
 		// Update closest robot index and distance if this robot is closest
 		if (dist < closest_d) {
 			closest_i = i;
@@ -904,7 +903,6 @@ int closestRobotToPoint(float x, float y, float z)
 		}
 	}
 
-	printf("\n");
 	return closest_i;
 }
 
@@ -925,10 +923,10 @@ void updateExplored()
 
 			// Only do the following if cell is within range of the swarm bounds
 			// and if not paused
-			if ((world_x > data.bounds.x - p.range) &&
-				(world_x < data.bounds.y + p.range) &&
-				(world_y > data.bounds.z - p.range) &&
-				(world_y < data.bounds.w + p.range) && !paused) {
+			if ((world_x > dat.bounds.x - p.range) &&
+				(world_x < dat.bounds.y + p.range) &&
+				(world_y > dat.bounds.z - p.range) &&
+				(world_y < dat.bounds.w + p.range) && !paused) {
 
 				// Check each robot to see if it is within range of this cell
 				for (uint n = 0; n < p.num_robots; n++) {
@@ -1019,7 +1017,7 @@ static void step(int value)
 			}
 			
 			// Process data of initial state
-			processData(positions, velocities, explored_grid, laplacian, ap, &data, p);
+			processData(positions, velocities, explored_grid, laplacian, ap, &dat, p);
 
 			// Indicates inital state has passed
 			init_passed = true;
@@ -1035,15 +1033,15 @@ static void step(int value)
 			updateExplored();
 		}
 		// Process data to get global swarm information (data_ops.h)
-		processData(positions, velocities, explored_grid, laplacian, ap, &data, p);
+		processData(positions, velocities, explored_grid, laplacian, ap, &dat, p);
 
 		// Update leader list (Very inefficient now, should compute at the same 
 		// time as convex hull)
 		for (uint i = 0; i < p.num_robots; i++) {
 			bool is_in_ch = false;
-			for (uint j = 0; j < data.ch.size(); j++) {
-				if (positions[i].x == data.ch[j].x &&
-					positions[i].y == data.ch[j].y) {
+			for (uint j = 0; j < dat.ch.size(); j++) {
+				if (positions[i].x == dat.ch[j].x &&
+					positions[i].y == dat.ch[j].y) {
 					is_in_ch = true;
 					break;
 				}
@@ -1053,7 +1051,7 @@ static void step(int value)
 
 		// Write data to the output log at the end of every step
 		if (p.log_data) {
-			fprintf(output_f, "%d %d %f %f %f %f %f %f %f %f %d\n", step_num, p.behavior, -goal_heading, p.vel_bound, data.heading_avg, data.heading_var, data.centroid.x, data.centroid.y, data.ch_area, data.connectivity, data.explored);
+			fprintf(output_f, "%d %d %f %f %f %f %f %f %f %f %d\n", step_num, p.behavior, -goal_heading, p.vel_bound, dat.heading_avg, dat.heading_var, dat.centroid.x, dat.centroid.y, dat.ch_area, dat.connectivity, dat.explored);
 		}
 
 		// Increment the simulation step counter
@@ -1067,6 +1065,8 @@ static void step(int value)
 
 int main(int argc, char** argv)
 {
+	nanogui::init();
+
 	// Reseed RNG
 	srand((uint)(time(NULL)));
 
